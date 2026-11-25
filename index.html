@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Olu ķērājs – LCD spēle</title>
+<style>
+  :root { --body:#c9402f; --lcd:#b9c5a0; --ink:#1b2014; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:#22252b; font-family:system-ui,sans-serif; color:#eee; }
+  body { display:flex; align-items:center; justify-content:center; }
+  .device { width:min(96vw,680px); background:var(--body); border-radius:28px; padding:16px;
+            box-shadow:0 10px 40px #0008, inset 0 -6px 0 #0003; }
+  .brand { text-align:center; font-weight:800; letter-spacing:.3em; color:#ffe9b8; font-size:14px; margin:2px 0 10px; }
+  .screen { background:var(--lcd); border-radius:10px; border:6px solid #222; padding:0; touch-action:none; }
+  canvas { display:block; width:100%; height:auto; border-radius:4px; }
+  .pad { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .pad button { height:56px; border:0; border-radius:50px; background:#ffd24d; color:#5a1d12;
+                font-weight:800; font-size:15px; box-shadow:0 4px 0 #b88a14; }
+  .pad button:active { transform:translateY(3px); box-shadow:0 1px 0 #b88a14; }
+  .hint { text-align:center; font-size:12px; color:#ffe9b8; margin-top:10px; opacity:.9; }
+</style>
+</head>
+<body>
+<div class="device">
+  <div class="brand">OLU ĶĒRĀJS</div>
+  <div class="screen"><canvas id="c" width="640" height="420"></canvas></div>
+  <div class="pad">
+    <button data-p="0">↖ AUGŠĀ KREISI</button>
+    <button data-p="2">AUGŠĀ LABI ↗</button>
+    <button data-p="1">↙ LEJĀ KREISI</button>
+    <button data-p="3">LEJĀ LABI ↘</button>
+  </div>
+  <div class="hint">Tastatūra: bultiņas vai Q A / P L · Starts: atstarpe</div>
+</div>
+<script>
+(() => {
+  const cv = document.getElementById('c'), g = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const BG = '#b9c5a0', INK = '#1b2014', GHOST = 'rgba(27,32,20,0.09)';
+
+  // Pozīcijas: 0 = augšā kreisi, 1 = lejā kreisi, 2 = augšā labi, 3 = lejā labi
+  const LANES = [
+    { x0: 24,  x1: 228, y0: 96,  y1: 136 },
+    { x0: 24,  x1: 228, y0: 206, y1: 246 },
+    { x0: W-24, x1: W-228, y0: 96,  y1: 136 },
+    { x0: W-24, x1: W-228, y0: 206, y1: 246 },
+  ];
+  const STEPS = 5; // 0..4
+  const BASKET = [
+    { x: 262, y: 150 }, { x: 262, y: 262 },
+    { x: W-262, y: 150 }, { x: W-262, y: 262 },
+  ];
+
+  let state = 'title', score = 0, misses = 0, basket = 0;
+  let eggs = [], broken = [], lastTick = 0, acc = 0, lastLane = -1;
+  let hi = 0;
+  try { hi = +localStorage.getItem('eggHi') || 0; } catch (e) {}
+
+  // ---------- skaņa ----------
+  let ac;
+  function beep(f, d = 0.08, type = 'square', v = 0.05) {
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), a = ac.createGain();
+      o.type = type; o.frequency.value = f; a.gain.value = v;
+      o.connect(a); a.connect(ac.destination);
+      o.start(); a.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + d);
+      o.stop(ac.currentTime + d);
+    } catch (e) {}
+  }
+
+  // ---------- spēles loģika ----------
+  function start() {
+    state = 'play'; score = 0; misses = 0; eggs = []; broken = []; acc = 0; lastLane = -1;
+    lastTick = performance.now(); beep(660, .12);
+  }
+  function tickMs() { return Math.max(240, 640 - score * 4); }
+  function maxEggs() { return Math.min(5, 1 + Math.floor(score / 20)); }
+
+  function tick() {
+    // izšķir olas, kas sasniegušas galu
+    for (const e of eggs) {
+      if (e.step === STEPS - 1) {
+        if (e.lane === basket) { score++; beep(880, .06); }
+        else { misses++; broken.push({ lane: e.lane, t: performance.now() }); beep(150, .25, 'sawtooth'); }
+        e.dead = true;
+      } else e.step++;
+    }
+    eggs = eggs.filter(e => !e.dead);
+    if (misses >= 3) {
+      state = 'over';
+      if (score > hi) { hi = score; try { localStorage.setItem('eggHi', hi); } catch (e) {} }
+      beep(110, .6, 'sawtooth');
+      return;
+    }
+    // jaunas olas
+    if (eggs.length < maxEggs() && Math.random() < 0.55) {
+      let lane, tries = 0;
+      do { lane = (Math.random() * 4) | 0; tries++; } while ((lane === lastLane || eggs.some(e => e.lane === lane && e.step < 2)) && tries < 10);
+      eggs.push({ lane, step: 0 }); lastLane = lane;
+    }
+  }
+
+  // ---------- zīmēšana ----------
+  function eggPos(lane, step) {
+    const L = LANES[lane], t = step / (STEPS - 1);
+    return { x: L.x0 + (L.x1 - L.x0) * t, y: L.y0 + (L.y1 - L.y0) * t };
+  }
+  function drawEgg(x, y, col, ang = 0) {
+    g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = col;
+    g.beginPath(); g.ellipse(0, 0, 9, 12, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  }
+  function drawChutes(col) {
+    g.strokeStyle = col; g.lineWidth = 6; g.lineCap = 'round';
+    for (const L of LANES) {
+      g.beginPath(); g.moveTo(L.x0, L.y0 + 22); g.lineTo(L.x1, L.y1 + 22); g.stroke();
+      // atbalsta stabiņi
+      g.lineWidth = 4;
+      g.beginPath(); g.moveTo(L.x0, L.y0 + 22); g.lineTo(L.x0, L.y0 + 90); g.stroke();
+      g.lineWidth = 6;
+    }
+  }
+  function drawCoop() { // vistu kūts kreisajā/labajā pusē, sakārtoti augšā
+    g.fillStyle = INK;
+    for (const side of [0, 1]) {
+      const x = side ? W - 24 : 24;
+      for (let i = 0; i < 2; i++) {
+        const y = i ? 190 : 80;
+        g.fillRect(x - (side ? 0 : 20) , y, 20, 6);
+      }
+    }
+  }
+  function drawFarmer(col) {
+    const cx = W / 2;
+    g.fillStyle = col; g.strokeStyle = col; g.lineCap = 'round';
+    // cepure
+    g.fillRect(cx - 26, 118, 52, 8);
+    g.beginPath(); g.arc(cx, 118, 20, Math.PI, 0); g.fill();
+    // galva
+    g.beginPath(); g.arc(cx, 146, 19, 0, Math.PI * 2); g.fill();
+    // acis (izgriež fona krāsā)
+    g.fillStyle = BG;
+    g.fillRect(cx - 9, 142, 5, 5); g.fillRect(cx + 4, 142, 5, 5);
+    g.fillStyle = col;
+    // ķermenis
+    g.fillRect(cx - 22, 168, 44, 78);
+    // kājas
+    g.lineWidth = 12;
+    g.beginPath(); g.moveTo(cx - 10, 246); g.lineTo(cx - 12, 318); g.moveTo(cx + 10, 246); g.lineTo(cx + 12, 318); g.stroke();
+    g.fillRect(cx - 28, 318, 24, 8); g.fillRect(cx + 4, 318, 24, 8);
+  }
+  function drawBasketPose(i, col, arms = true) {
+    const b = BASKET[i], cx = W / 2, left = i < 2;
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 10; g.lineCap = 'round';
+    if (arms) {
+      g.beginPath(); g.moveTo(cx + (left ? -20 : 20), 180); g.lineTo(b.x + (left ? 22 : -22), b.y + 8); g.stroke();
+    }
+    // grozs (trapecija)
+    g.beginPath();
+    g.moveTo(b.x - 26, b.y - 14); g.lineTo(b.x + 26, b.y - 14);
+    g.lineTo(b.x + 18, b.y + 16); g.lineTo(b.x - 18, b.y + 16); g.closePath(); g.fill();
+  }
+
+  function draw(now) {
+    g.fillStyle = BG; g.fillRect(0, 0, W, H);
+
+    // "izslēgtie" LCD segmenti
+    drawChutes(GHOST); drawFarmer(GHOST);
+    for (let i = 0; i < 4; i++) {
+      drawBasketPose(i, GHOST);
+      for (let s = 0; s < STEPS; s++) { const p = eggPos(i, s); drawEgg(p.x, p.y, GHOST); }
+    }
+
+    // iekšējie segmenti
+    drawChutes(INK); drawCoop();
+    drawFarmer(INK); drawBasketPose(basket, INK);
+    // ola groza augšā, ja noķerta nesen
+    for (const e of eggs) {
+      const p = eggPos(e.lane, e.step);
+      drawEgg(p.x, p.y, INK, (e.step % 2 ? .35 : -.35));
+    }
+    // saplīsušas olas
+    broken = broken.filter(b => now - b.t < 900);
+    for (const b of broken) {
+      const L = LANES[b.lane], x = L.x1 + (b.lane < 2 ? 34 : -34), y = L.y1 + 70;
+      g.fillStyle = INK;
+      g.beginPath(); g.ellipse(x, y + 8, 16, 5, 0, 0, Math.PI * 2); g.fill();
+      for (let k = -1; k <= 1; k++) { g.fillRect(x + k * 11 - 2, y - 8 - (k === 0 ? 4 : 0), 4, 8); }
+    }
+
+    // HUD
+    g.fillStyle = INK; g.font = 'bold 40px "Courier New",monospace'; g.textAlign = 'right';
+    g.fillText(String(score).padStart(3, '0'), W - 24, 56);
+    g.font = 'bold 14px "Courier New",monospace'; g.textAlign = 'left';
+    g.fillText('REK ' + String(hi).padStart(3, '0'), 24, 30);
+    // kļūdas
+    g.font = 'bold 28px "Courier New",monospace'; g.textAlign = 'center';
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle = i < misses ? INK : GHOST;
+      g.fillText('✖', W / 2 - 36 + i * 36, 56);
+    }
+
+    if (state !== 'play') {
+      g.fillStyle = 'rgba(185,197,160,.88)'; g.fillRect(70, 150, W - 140, 130);
+      g.strokeStyle = INK; g.lineWidth = 4; g.strokeRect(70, 150, W - 140, 130);
+      g.fillStyle = INK; g.textAlign = 'center';
+      g.font = 'bold 34px "Courier New",monospace';
+      g.fillText(state === 'title' ? 'OLU ĶĒRĀJS' : 'SPĒLE BEIGUSIES', W / 2, 200);
+      g.font = 'bold 18px "Courier New",monospace';
+      if (state === 'over') g.fillText('Rezultāts: ' + score, W / 2, 232);
+      g.fillText('Atstarpe / pieskāriens – sākt', W / 2, 262);
+    }
+  }
+
+  function loop(now) {
+    if (state === 'play') {
+      acc += now - lastTick;
+      while (acc >= tickMs() && state === 'play') { acc -= tickMs(); tick(); }
+    }
+    lastTick = now;
+    draw(now);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- vadība ----------
+  function setBasket(i) { if (basket !== i) { basket = i; beep(300, .03, 'square', .02); } }
+  const keys = {};
+  addEventListener('keydown', e => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    if (state !== 'play' && (e.key === ' ' || e.key === 'Enter')) return start();
+    let left = basket < 2, top = basket % 2 === 0;
+    switch (e.key.toLowerCase()) {
+      case 'arrowleft': left = true; break;
+      case 'arrowright': left = false; break;
+      case 'arrowup': top = true; break;
+      case 'arrowdown': top = false; break;
+      case 'q': left = true; top = true; break;
+      case 'a': left = true; top = false; break;
+      case 'p': left = false; top = true; break;
+      case 'l': left = false; top = false; break;
+      default: return;
+    }
+    setBasket((left ? 0 : 2) + (top ? 0 : 1));
+  });
+  document.querySelectorAll('.pad button').forEach(b => {
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (state !== 'play') return start();
+      setBasket(+b.dataset.p);
+    });
+  });
+  cv.addEventListener('pointerdown', e => {
+    const r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    if (state !== 'play') return start();
+    setBasket((x < .5 ? 0 : 2) + (y < .5 ? 0 : 1));
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
