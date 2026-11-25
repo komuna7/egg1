@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Olu ķērājs – LCD spēle</title>
+<title>Vilks un olas – LCD spēle</title>
 <style>
   :root { --body:#c9402f; --lcd:#b9c5a0; --ink:#1b2014; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -23,7 +23,7 @@
 </head>
 <body>
 <div class="device">
-  <div class="brand">OLU ĶĒRĀJS</div>
+  <div class="brand">VILKS UN OLAS</div>
   <div class="screen"><canvas id="c" width="640" height="420"></canvas></div>
   <div class="pad">
     <button data-p="0">↖ AUGŠĀ KREISI</button>
@@ -41,10 +41,10 @@
 
   // Pozīcijas: 0 = augšā kreisi, 1 = lejā kreisi, 2 = augšā labi, 3 = lejā labi
   const LANES = [
-    { x0: 24,  x1: 228, y0: 96,  y1: 136 },
-    { x0: 24,  x1: 228, y0: 206, y1: 246 },
-    { x0: W-24, x1: W-228, y0: 96,  y1: 136 },
-    { x0: W-24, x1: W-228, y0: 206, y1: 246 },
+    { x0: 64,  x1: 228, y0: 100, y1: 136 },
+    { x0: 64,  x1: 228, y0: 210, y1: 246 },
+    { x0: W-64, x1: W-228, y0: 100, y1: 136 },
+    { x0: W-64, x1: W-228, y0: 210, y1: 246 },
   ];
   const STEPS = 5; // 0..4
   const BASKET = [
@@ -121,34 +121,61 @@
       g.lineWidth = 6;
     }
   }
-  function drawCoop() { // vistu kūts kreisajā/labajā pusē, sakārtoti augšā
-    g.fillStyle = INK;
-    for (const side of [0, 1]) {
-      const x = side ? W - 24 : 24;
-      for (let i = 0; i < 2; i++) {
-        const y = i ? 190 : 80;
-        g.fillRect(x - (side ? 0 : 20) , y, 20, 6);
-      }
+  function drawHens(col) { // vistas uz laktām katras teknes sākumā
+    for (let i = 0; i < 4; i++) {
+      const L = LANES[i], d = i < 2 ? 1 : -1, x = L.x0 - d * 34, y = L.y0 - 2;
+      g.fillStyle = col; g.strokeStyle = col; g.lineCap = 'round';
+      // lakta
+      g.fillRect(x - 22, y + 14, 44, 5);
+      // ķermenis
+      g.beginPath(); g.ellipse(x, y, 16, 11, 0, 0, Math.PI * 2); g.fill();
+      // aste
+      g.beginPath(); g.moveTo(x - d * 12, y - 4); g.lineTo(x - d * 26, y - 16); g.lineTo(x - d * 22, y + 2); g.fill();
+      // galva + sekste + knābis
+      g.beginPath(); g.arc(x + d * 13, y - 12, 7, 0, Math.PI * 2); g.fill();
+      g.fillRect(x + d * 13 - 3, y - 23, 6, 5);
+      g.beginPath(); g.moveTo(x + d * 19, y - 14); g.lineTo(x + d * 26, y - 11); g.lineTo(x + d * 19, y - 9); g.fill();
+      // kājas
+      g.lineWidth = 2;
+      g.beginPath(); g.moveTo(x - 4, y + 9); g.lineTo(x - 4, y + 14); g.moveTo(x + 4, y + 9); g.lineTo(x + 4, y + 14); g.stroke();
+      // acs
+      if (col === INK) { g.fillStyle = BG; g.fillRect(x + d * 14 - 1, y - 14, 3, 3); }
     }
   }
-  function drawFarmer(col) {
+  function drawWolfBody(col) {
     const cx = W / 2;
     g.fillStyle = col; g.strokeStyle = col; g.lineCap = 'round';
-    // cepure
-    g.fillRect(cx - 26, 118, 52, 8);
-    g.beginPath(); g.arc(cx, 118, 20, Math.PI, 0); g.fill();
-    // galva
-    g.beginPath(); g.arc(cx, 146, 19, 0, Math.PI * 2); g.fill();
-    // acis (izgriež fona krāsā)
-    g.fillStyle = BG;
-    g.fillRect(cx - 9, 142, 5, 5); g.fillRect(cx + 4, 142, 5, 5);
-    g.fillStyle = col;
     // ķermenis
-    g.fillRect(cx - 22, 168, 44, 78);
+    g.beginPath(); g.ellipse(cx, 208, 25, 44, 0, 0, Math.PI * 2); g.fill();
     // kājas
     g.lineWidth = 12;
-    g.beginPath(); g.moveTo(cx - 10, 246); g.lineTo(cx - 12, 318); g.moveTo(cx + 10, 246); g.lineTo(cx + 12, 318); g.stroke();
-    g.fillRect(cx - 28, 318, 24, 8); g.fillRect(cx + 4, 318, 24, 8);
+    g.beginPath(); g.moveTo(cx - 10, 244); g.lineTo(cx - 14, 316); g.moveTo(cx + 10, 244); g.lineTo(cx + 14, 316); g.stroke();
+    g.beginPath(); g.ellipse(cx - 22, 320, 14, 6, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(cx + 22, 320, 14, 6, 0, 0, Math.PI * 2); g.fill();
+    // vēders (gaišāks laukums)
+    if (col === INK) { g.fillStyle = BG; g.beginPath(); g.ellipse(cx, 216, 11, 24, 0, 0, Math.PI * 2); g.fill(); }
+  }
+  function drawWolfHead(left, col) { // galva un aste pagriezta uz groza pusi
+    const cx = W / 2, d = left ? -1 : 1;
+    g.fillStyle = col; g.strokeStyle = col; g.lineCap = 'round';
+    // aste (pretējā pusē)
+    g.save(); g.translate(cx - d * 42, 240); g.rotate(d * 0.6);
+    g.beginPath(); g.ellipse(0, 0, 30, 10, 0, 0, Math.PI * 2); g.fill(); g.restore();
+    // galva
+    g.beginPath(); g.arc(cx + d * 4, 140, 21, 0, Math.PI * 2); g.fill();
+    // purns
+    g.beginPath(); g.moveTo(cx + d * 14, 128); g.lineTo(cx + d * 50, 142); g.lineTo(cx + d * 46, 152); g.lineTo(cx + d * 12, 158); g.fill();
+    // ausis
+    g.beginPath(); g.moveTo(cx - 14, 128); g.lineTo(cx - 12 + d * 2, 98); g.lineTo(cx, 124); g.fill();
+    g.beginPath(); g.moveTo(cx + 2, 122); g.lineTo(cx + 12 + d * 4, 96); g.lineTo(cx + 18, 126); g.fill();
+    if (col === INK) {
+      g.fillStyle = BG;
+      // acs, mute
+      g.beginPath(); g.arc(cx + d * 14, 134, 4, 0, Math.PI * 2); g.fill();
+      g.fillRect(cx + d * 22 - (d < 0 ? 22 : 0), 150, 22, 2);
+      // degungals
+      g.fillStyle = INK; g.beginPath(); g.arc(cx + d * 50, 145, 5, 0, Math.PI * 2); g.fill();
+    }
   }
   function drawBasketPose(i, col, arms = true) {
     const b = BASKET[i], cx = W / 2, left = i < 2;
@@ -166,15 +193,15 @@
     g.fillStyle = BG; g.fillRect(0, 0, W, H);
 
     // "izslēgtie" LCD segmenti
-    drawChutes(GHOST); drawFarmer(GHOST);
+    drawChutes(GHOST); drawWolfBody(GHOST); drawWolfHead(true, GHOST); drawWolfHead(false, GHOST);
     for (let i = 0; i < 4; i++) {
       drawBasketPose(i, GHOST);
       for (let s = 0; s < STEPS; s++) { const p = eggPos(i, s); drawEgg(p.x, p.y, GHOST); }
     }
 
     // iekšējie segmenti
-    drawChutes(INK); drawCoop();
-    drawFarmer(INK); drawBasketPose(basket, INK);
+    drawChutes(INK); drawHens(INK);
+    drawWolfBody(INK); drawWolfHead(basket < 2, INK); drawBasketPose(basket, INK);
     // ola groza augšā, ja noķerta nesen
     for (const e of eggs) {
       const p = eggPos(e.lane, e.step);
@@ -206,7 +233,7 @@
       g.strokeStyle = INK; g.lineWidth = 4; g.strokeRect(70, 150, W - 140, 130);
       g.fillStyle = INK; g.textAlign = 'center';
       g.font = 'bold 34px "Courier New",monospace';
-      g.fillText(state === 'title' ? 'OLU ĶĒRĀJS' : 'SPĒLE BEIGUSIES', W / 2, 200);
+      g.fillText(state === 'title' ? 'VILKS UN OLAS' : 'SPĒLE BEIGUSIES', W / 2, 200);
       g.font = 'bold 18px "Courier New",monospace';
       if (state === 'over') g.fillText('Rezultāts: ' + score, W / 2, 232);
       g.fillText('Atstarpe / pieskāriens – sākt', W / 2, 262);
