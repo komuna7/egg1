@@ -16,6 +16,7 @@ Palaišana:  python3 tools/fuel_feed.py            (no S3supermini_Energ mapes)
 from __future__ import annotations
 
 import argparse
+import html
 import datetime as dt
 import json
 import re
@@ -223,6 +224,24 @@ def merge_station(stations: dict, brand: str, address: str, lat: float, lon: flo
         entry["p"][fuel] = price if old is None else min(old, price)
 
 
+def diagnose(brand: str, page: str, rows: list[dict]) -> None:
+    """Žurnālam: ko lapā atrada, lai varētu pielāgot parseri."""
+    print(f"--- {brand}: {len(page)} baiti, <tr>: {page.lower().count('<tr')}, rindas ar cenu: {len(rows)}")
+    for row in rows[:4]:
+        print(f"    {row['fuel']} {row['price']} {row['addresses'][:3]}")
+    if rows:
+        return
+    text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", page, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", " | ", text)
+    text = re.sub(r"\s+", " ", html.unescape(text))
+    for match in list(PRICE_RE.finditer(text))[:6]:
+        print("    ...", text[max(0, match.start() - 160):match.end() + 160])
+    for marker in ("__NEXT_DATA__", "application/json", "wp-json", "api/"):
+        if marker in page:
+            at = page.find(marker)
+            print(f"    atrasts {marker!r}: {page[max(0, at - 80):at + 200]!r}")
+
+
 def build(offline: bool = False, sources_path: Path = SOURCES) -> dict:
     sources = json.loads(sources_path.read_text("utf-8"))
     geocoder = Geocoder(GEOCACHE, offline)
@@ -233,16 +252,21 @@ def build(offline: bool = False, sources_path: Path = SOURCES) -> dict:
             continue
         brand = source["brand"]
         try:
-            rows = parse_price_table(fetch(source["url"]), source.get("fuel_rules"))
+            page = fetch(source["url"])
+            rows = parse_price_table(page, source.get("fuel_rules"))
+            diagnose(brand, page, rows)
         except Exception as error:
             report.append(f"{brand}: kļūda {error}")
             continue
-        located = 0
+        located = missed = 0
         for row in rows:
             for address in row["addresses"]:
                 query = address if re.search(r"latvij", fold(address)) else f"{address}, Latvija"
                 point = geocoder.locate(query)
                 if not point:
+                    missed += 1
+                    if missed <= 5:
+                        print(f"    nav koordinātu: {query}")
                     continue
                 located += 1
                 merge_station(stations, brand, address, point[0], point[1],
@@ -271,8 +295,8 @@ def main() -> int:
     DATA.mkdir(exist_ok=True)
     feed = build(args.offline)
     if not feed["stations"] and args.output.exists():
-        print("Neviena stacija netika atrasta; vecais fails paliek.", file=sys.stderr)
-        return 1
+        print("::warning::Neviena stacija netika atrasta; vecais fails paliek.")
+        return 0
     text = json.dumps(feed, ensure_ascii=False, separators=(",", ":"))
     # Pa vienai stacijai rindā, lai git izmaiņas būtu pārskatāmas.
     text = text.replace('},{"b"', '},\n{"b"')
