@@ -1,4 +1,4 @@
-name: Energ degvielas cenas
+name: Energ cenas
 
 on:
   schedule:
@@ -27,14 +27,16 @@ jobs:
         run: python -m unittest tools/test_fuel_feed.py
       - name: Veido fuel.json
         run: python tools/fuel_feed.py
+      - name: Veido electricity.json (rezerve web versijai)
+        run: python tools/electricity_feed.py || echo "Elering nav pieejams, turpina"
       - name: Saglabā izmaiņas
         run: |
           git config user.name "energ-fuel-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/fuel.json data/geocache.json
+          git add data/
           if git diff --cached --quiet; then
             echo "Nav izmaiņu"
           else
-            git commit -m "Energ: degvielas cenas $(date -u +%Y-%m-%dT%H:%MZ)"
+            git commit -m "Energ: cenas $(date -u +%Y-%m-%dT%H:%MZ)"
             git push
           fi

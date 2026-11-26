@@ -89,6 +89,23 @@ Cenu atslēgas: `lpg`, `95`, `98`, `dd`. Trūkstošu degvielu vienkārši neiera
 `data/manual_stations.json` ir tādu pašu staciju saraksts (bez `updated`). Ar to var pievienot
 stacijas, kuru tīklam nav lapas, vai salabot koordinātas.
 
+## Web versija
+
+[`web/index.html`](web/index.html) dara to pašu bez ierīces, pārlūkā: sadaļas mainās pa kārtai,
+pieskāriens pārslēdz uz nākamo, **Pilnekrāns** rāda tikai ekrānu (piem., planšetei uz sienas).
+Iestatījumi ir tādi paši kā ierīcei (sadaļas un sekundes, PVN, 95/98, punkts kartē, maksimālais
+laiks, ātrums, turp un atpakaļ). Tos atceras pārlūks. Papildus ir poga **Mana atrašanās vieta**,
+lētāko staciju tabula robežās un saite **Maršruts** uz Google Maps.
+
+Kad zars ir apvienots ar `main`, GitHub Pages to publicē adresē
+<https://komuna7.github.io/egg1/S3supermini_Energ/web/>. Lapu var atvērt arī kā failu.
+
+Dati:
+
+- elektrība tieši no Elering API. Ja pārlūks to nevar nolasīt, lapa ņem `data/electricity.json`,
+  ko tā pati Action veido ar [`tools/electricity_feed.py`](tools/electricity_feed.py);
+- degviela no `data/fuel.json` (tas pats fails, ko lasa ESP).
+
 ## Būvēšana un ielāde
 
 Rīki tādi paši kā oriģinālam: Arduino CLI, ESP32 core `esp32:esp32` 3.3.x, bibliotēkas
@@ -157,5 +174,7 @@ oriģinālie `/api/wifi`, `/api/setup/*`, `/api/factory-reset`.
 | `tools/test_fuel_feed.py` | Parsera testi |
 | `data/fuel.json` | Staciju saraksts, ko lasa ESP (to atjauno Action) |
 | `data/geocache.json`, `data/manual_stations.json` | Koordinātu kešs un paša stacijas |
+| `web/index.html` | Web versija |
+| `tools/electricity_feed.py`, `data/electricity.json` | Elektrības cenu rezerve web versijai |
 | `test/` | Programmas loģikas tests datorā |
 | `S3supermini_shema.svg` | Pieslēguma shēma (tāda pati kā oriģinālam) |
