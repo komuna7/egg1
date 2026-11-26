@@ -38,6 +38,25 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(rows["95"]["addresses"], ["Rīga, Krasta iela 101", "Ogre, Rīgas iela 23"])
         self.assertEqual(rows["lpg"]["price"], 0.819)
 
+    def test_comma_lists(self):
+        self.assertEqual(ff.split_addresses("Brīvības gatve 203, Brīvības gatve 265"),
+                         ["Brīvības gatve 203", "Brīvības gatve 265"])
+        self.assertEqual(ff.split_addresses("Kārļa Ulmaņa gatve 67, Rīga"), ["Kārļa Ulmaņa gatve 67, Rīga"])
+        self.assertEqual(ff.split_addresses("Rīga, Krasta iela 101, LV-1019"), ["Rīga, Krasta iela 101, LV-1019"])
+
+    def test_token_stream(self):
+        page = """<div>Degvielas veids</div><div>Cena EUR litrā</div><div>Degvielas uzpildes stacijas</div>
+        <div><span>95 Multi FX</span><b>1.647</b><i>EUR / L</i><p>ADUS Ulmaņa</p><p>Kārļa Ulmaņa gatve 67, Rīga</p>
+        <p>ADUS Salaspils</p><p>ADUS Liepāja 2</p><p>Salaspils iela 4a, Rīga</p></div>
+        <div><span>D</span><b>1.924</b><i>EUR / L</i><p>DUS Dārzciema</p><p>Dārzciema iela 69, Rīga</p></div>
+        <div><span>Gāze</span><b>1.117</b><p>ADUS Saharova</p><p>Andreja Saharova iela 10, Rīga</p></div>
+        <div><span>E85</span><b>1.300</b><p>ADUS Valdeķu</p><p>Valdeķu iela 34, Rīga</p></div>"""
+        rows = {r["fuel"]: r for r in ff.parse_page(page)}
+        self.assertEqual(set(rows), {"95", "dd", "lpg"})
+        self.assertEqual(rows["95"]["addresses"], ["Kārļa Ulmaņa gatve 67, Rīga", "Salaspils iela 4a, Rīga"])
+        self.assertEqual(rows["dd"]["price"], 1.924)
+        self.assertEqual(rows["lpg"]["addresses"], ["Andreja Saharova iela 10, Rīga"])
+
     def test_merge_keeps_lowest(self):
         stations = {}
         ff.merge_station(stations, "Virši", "A", 56.9, 24.1, {"95": 1.6})

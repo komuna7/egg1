@@ -77,16 +77,38 @@ def find_price(text: str) -> float | None:
     return None
 
 
-ADDRESS_HINT = re.compile(
-    r"\b(iela|ielа|gatve|šoseja|soseja|ceļš|cels|prospekts|bulvāris|bulvaris|laukums|"
-    r"novads|pagasts|pag\.|nov\.|rīga|riga|daugavpils|liepāja|jelgava|jūrmala|ventspils|"
-    r"rēzekne|valmiera|ogre|tukums|cēsis|sigulda|salaspils|\d+[a-z]?\b)",
+# Adresei vajag ielas vārdu vai "nosaukums numurs, pilsēta". Stacijas nosaukums
+# (piem., "ADUS Salaspils" vai "ADUS Liepāja 2") neder.
+STREET_WORD = re.compile(
+    r"\b(iela|gatve|šoseja|soseja|ceļš|cels|prospekts|bulvāris|bulvaris|laukums|krastmala|"
+    r"aleja|dambis|līnija|linija|novads|pagasts|pag\.|nov\.)\b",
     re.IGNORECASE,
 )
 
 
+def split_commas(part: str) -> list[str]:
+    """'Brīvības gatve 203, Brīvības gatve 265' -> divas adreses; 'Rīga, X iela 1' un
+    'X iela 1, Rīga, LV-1001' paliek kopā (pilsēta/indekss pievienojas adresei)."""
+    entries: list[str] = []
+    prefix = ""
+    for piece in (p.strip() for p in part.split(",")):
+        if not piece:
+            continue
+        has_number = re.search(r"\d", piece) and not re.fullmatch(r"LV-?\d{4}", piece, re.I)
+        if has_number:
+            entries.append(f"{prefix}, {piece}" if prefix else piece)
+            prefix = ""
+        elif entries:
+            entries[-1] += ", " + piece
+        else:
+            prefix = f"{prefix}, {piece}" if prefix else piece
+    if prefix:
+        entries.append(prefix)
+    return entries
+
+
 def split_addresses(text: str) -> list[str]:
-    parts = re.split(r"\n|;|•|\|", text)
+    parts = [c for p in re.split(r"\n|;|•|\|", text) for c in split_commas(p)]
     result = []
     for part in parts:
         part = re.sub(r"\s+", " ", part).strip(" ,.-–")
@@ -94,7 +116,7 @@ def split_addresses(text: str) -> list[str]:
             continue
         if PRICE_RE.search(part) or classify_fuel(part):
             continue
-        if ADDRESS_HINT.search(part):
+        if STREET_WORD.search(part) or (re.search(r"\d", part) and "," in part):
             result.append(part)
     return result
 
@@ -163,12 +185,56 @@ def parse_price_table(page: str, rules: dict[str, str] | None = None) -> list[di
     return found
 
 
+def page_tokens(page: str) -> list[str]:
+    """Lapas teksts gabalos pa HTML elementiem."""
+    text = re.sub(r"<script.*?</script>|<style.*?</style>|<!--.*?-->", " ", page, flags=re.S | re.I)
+    tokens = (re.sub(r"\s+", " ", html.unescape(t)).strip() for t in re.split(r"<[^>]+>", text))
+    return [t for t in tokens if t]
+
+
+def parse_token_stream(page: str, rules: dict[str, str] | None = None) -> list[dict]:
+    """Lapām bez tabulām: 'degviela | cena | ... | adrese | adrese | nākamā degviela | cena'."""
+    tokens = page_tokens(page)
+    is_price = lambda t: len(t) < 25 and find_price(t) is not None  # noqa: E731
+    groups: list[dict] = []
+    current = None
+    for index, token in enumerate(tokens):
+        if is_price(token):
+            continue
+        ahead = [t for t in tokens[index + 1:index + 3] if is_price(t)]
+        if ahead and len(token) < 40 and not split_addresses(token):
+            kind = classify_fuel(token, rules)
+            current = {"fuel": kind, "price": find_price(ahead[0]), "addresses": []} if kind else None
+            if current:
+                groups.append(current)
+            continue
+        if current:
+            current["addresses"].extend(split_addresses(token))
+    return [g for g in groups if g["addresses"]]
+
+
+def parse_page(page: str, rules: dict[str, str] | None = None) -> list[dict]:
+    rows = [r for r in parse_price_table(page, rules) if r["addresses"]]
+    return rows or parse_token_stream(page, rules)
+
+
 def fetch(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT,
                                                    "Accept-Language": "lv,en;q=0.5"})
     with urllib.request.urlopen(request, timeout=30) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return response.read().decode(charset, errors="replace")
+
+
+def fetch_first(urls: list[str]) -> tuple[str, str]:
+    error: Exception | None = None
+    for url in urls:
+        try:
+            return fetch(url), url
+        except Exception as problem:  # nākamā adrese
+            print(f"    {url}: {problem}")
+            error = problem
+    raise error or RuntimeError("nav adreses")
 
 
 class Geocoder:
@@ -231,6 +297,13 @@ def diagnose(brand: str, page: str, rows: list[dict]) -> None:
         print(f"    {row['fuel']} {row['price']} {row['addresses'][:3]}")
     if rows:
         return
+    parser = TableRows()
+    parser.feed(page)
+    for cells in parser.rows[:8]:
+        print("    tr:", [c[:60] for c in cells])
+    for word in ("Futura", "futura", "price", "cena"):
+        for match in list(re.finditer(word, page))[:2]:
+            print(f"    {word}: {page[max(0, match.start() - 150):match.end() + 150]!r}")
     text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", page, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", " | ", text)
     text = re.sub(r"\s+", " ", html.unescape(text))
@@ -252,8 +325,9 @@ def build(offline: bool = False, sources_path: Path = SOURCES) -> dict:
             continue
         brand = source["brand"]
         try:
-            page = fetch(source["url"])
-            rows = parse_price_table(page, source.get("fuel_rules"))
+            page, url = fetch_first(source.get("urls") or [source["url"]])
+            rows = parse_page(page, source.get("fuel_rules"))
+            print(f"--- {brand}: {url}")
             diagnose(brand, page, rows)
         except Exception as error:
             report.append(f"{brand}: kļūda {error}")
@@ -263,6 +337,8 @@ def build(offline: bool = False, sources_path: Path = SOURCES) -> dict:
             for address in row["addresses"]:
                 query = address if re.search(r"latvij", fold(address)) else f"{address}, Latvija"
                 point = geocoder.locate(query)
+                if not point and source.get("default_city") and "," not in address:
+                    point = geocoder.locate(f"{address}, {source['default_city']}, Latvija")
                 if not point:
                     missed += 1
                     if missed <= 5:
