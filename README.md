@@ -13,3 +13,6 @@ Retro LCD stila spēle pārlūkā (viens HTML fails, bez atkarībām), iedvesmot
 Atver `index.html` pārlūkā vai uzliec GitHub Pages (Settings → Pages → branch `main`, root).
 
 Spēles tēls un grafika ir oriģināli.
+
+## Citi projekti šajā repozitorijā
+- [`S3supermini_Energ`](S3supermini_Energ/): ESP32-S3 galda ekrāns ar elektrības biržas un lētākās tuvējās degvielas cenām.

@@ -1,0 +1,40 @@
+name: Energ degvielas cenas
+
+on:
+  schedule:
+    - cron: "17 */2 * * *"   # ik pēc 2 stundām (UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: energ-fuel
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: S3supermini_Energ
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Testi
+        run: python -m unittest tools/test_fuel_feed.py
+      - name: Veido fuel.json
+        run: python tools/fuel_feed.py
+      - name: Saglabā izmaiņas
+        run: |
+          git config user.name "energ-fuel-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/fuel.json data/geocache.json
+          if git diff --cached --quiet; then
+            echo "Nav izmaiņu"
+          else
+            git commit -m "Energ: degvielas cenas $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
