@@ -6,7 +6,9 @@
   },
   {
     "brand": "Neste",
-    "url": "https://www.neste.lv/lv/content/degvielas-cenas"
+    "url": "https://www.neste.lv/lv/content/degvielas-cenas",
+    "enabled": false,
+    "note": "Cenas lapā ielādē JavaScript; HTML tās nesatur."
   },
   {
     "brand": "Virši",

@@ -60,11 +60,11 @@ def classify_fuel(label: str, rules: dict[str, str] | None = None) -> str | None
         return None
     if re.search(r"gaze|lpg|autogaz|propan", text):
         return "lpg"
-    if re.search(r"\b98\b|98e|98 ?e\b", text):
+    if re.search(r"(?<!\d)98(?!\d)", text):
         return "98"
-    if re.search(r"\b95\b|95e|95 ?e\b", text):
+    if re.search(r"(?<!\d)95(?!\d)", text):
         return "95"
-    if re.search(r"dizel|diesel|\bdd\b|\bd\b|miles\+? ?d|futura d|\bd ?(?:miles|futura)", text):
+    if re.search(r"dizel|diesel|\bdd\b|\bd\b|miles\+? ?d\b|futura d|\bd ?(?:miles|futura)|\bxtl\b|\bhvo\b", text):
         return "dd"
     return None
 

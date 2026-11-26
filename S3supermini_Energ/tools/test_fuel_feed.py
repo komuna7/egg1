@@ -21,7 +21,8 @@ class ParseTest(unittest.TestCase):
     def test_classify(self):
         cases = {"Futura 95": "95", "95E": "95", "Neste Futura 98": "98", "Pro Diesel": "dd",
                  "DD": "dd", "miles D": "dd", "Gāze": "lpg", "LPG": "lpg", "AdBlue": None,
-                 "CNG": None}
+                 "CNG": None, "95miles": "95", "98miles+": "98", "Dmiles": "dd", "Dmiles+": "dd",
+                 "miles+ XTL": "dd", "Autogāze": "lpg", "Neste Futura 95 benzīns": "95"}
         for label, kind in cases.items():
             self.assertEqual(ff.classify_fuel(label), kind, label)
 
