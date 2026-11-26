@@ -1,11 +1,19 @@
 [
-  {"brand": "Circle K", "url": "https://www.circlek.lv/degvielas-cenas", "default_city": "Rīga"},
-  {"brand": "Neste", "url": "https://www.neste.lv/lv/content/degvielas-cenas"},
-  {"brand": "Virši", "urls": [
-    "https://www.virsi.lv/lv/privatpersonam/degvielas-cenas",
-    "https://www.virsi.lv/lv/degvielas-cenas",
-    "https://www.virsi.lv/lv/privatpersonam/degviela",
-    "https://www.virsi.lv/lv"
-  ]},
-  {"brand": "Viada", "url": "https://www.viada.lv/zemakas-degvielas-cenas/"}
+  {
+    "brand": "Circle K",
+    "url": "https://www.circlek.lv/degvielas-cenas",
+    "default_city": "Rīga"
+  },
+  {
+    "brand": "Neste",
+    "url": "https://www.neste.lv/lv/content/degvielas-cenas"
+  },
+  {
+    "brand": "Virši",
+    "url": "https://www.virsi.lv/lv/privatpersonam/degviela/degvielas-un-elektrouzlades-cenas"
+  },
+  {
+    "brand": "Viada",
+    "url": "https://www.viada.lv/zemakas-degvielas-cenas/"
+  }
 ]

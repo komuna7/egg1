@@ -295,12 +295,14 @@ def diagnose(brand: str, page: str, rows: list[dict]) -> None:
     print(f"--- {brand}: {len(page)} baiti, <tr>: {page.lower().count('<tr')}, rindas ar cenu: {len(rows)}")
     for row in rows[:4]:
         print(f"    {row['fuel']} {row['price']} {row['addresses'][:3]}")
-    if rows:
-        return
     parser = TableRows()
     parser.feed(page)
-    for cells in parser.rows[:8]:
-        print("    tr:", [c[:60] for c in cells])
+    for cells in parser.rows[:10]:
+        print("    tr:", [re.sub(r"\s+", " ", c)[:70] for c in cells])
+    if rows:
+        return
+    for match in list(PRICE_RE.finditer(page))[:8]:
+        print("    raw:", repr(page[max(0, match.start() - 200):match.end() + 60]))
     for word in ("Futura", "futura", "price", "cena"):
         for match in list(re.finditer(word, page))[:2]:
             print(f"    {word}: {page[max(0, match.start() - 150):match.end() + 150]!r}")
