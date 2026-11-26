@@ -1,4 +1,4 @@
-{"updated":"2026-11-26T00:55:11+00:00","stations":[{"b":"Viada","a":"Zemnieku iela 58, Liepāja","lat":56.52146,"lon":21.02705,"p":{"dd":1.857}},
+{"updated":"2026-11-26T00:56:27+00:00","stations":[{"b":"Viada","a":"Zemnieku iela 58, Liepāja","lat":56.52146,"lon":21.02705,"p":{"dd":1.857}},
 {"b":"Viada","a":"Valdeķu iela 34, Rīga","lat":56.91027,"lon":24.09617,"p":{"95":1.647,"98":1.752,"dd":1.857,"lpg":1.117}},
 {"b":"Viada","a":"Salaspils iela 4a, Rīga","lat":56.92265,"lon":24.17984,"p":{"95":1.647,"98":1.752,"dd":1.857}},
 {"b":"Viada","a":"Kārļa Ulmaņa gatve 67, Rīga","lat":56.92728,"lon":24.0497,"p":{"95":1.647,"98":1.752,"dd":1.857}},
@@ -11,4 +11,5 @@
 {"b":"Circle K","a":"Augusta Deglava iela 164C","lat":56.94281,"lon":24.22963,"p":{"lpg":1.12}},
 {"b":"Viada","a":"Vecā Biķernieku iela 1, Rīga","lat":56.95836,"lon":24.23926,"p":{"95":1.647,"98":1.752,"dd":1.857}},
 {"b":"Circle K","a":"Brīvības gatve 203","lat":56.97404,"lon":24.16813,"p":{"dd":1.911}},
-{"b":"Circle K","a":"Brīvības gatve 265","lat":56.97914,"lon":24.18435,"p":{"dd":1.911,"lpg":1.12}}]}
+{"b":"Circle K","a":"Brīvības gatve 265","lat":56.97914,"lon":24.18435,"p":{"dd":1.911,"lpg":1.12}},
+{"b":"Virši","a":"Brīvības gatve 297, Rīga, LV-1006","lat":56.98144,"lon":24.19245,"p":{"dd":1.899,"95":1.699,"98":1.769}}]}
