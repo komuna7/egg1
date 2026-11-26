@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101813">
+<title>Energ cenas</title>
+<meta name="description" content="Latvijas elektrības biržas cena un lētākā degviela tuvumā.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+:root{
+  --ground:#eef1ec;--panel:#fbfcfa;--ink:#17231d;--soft:#5b6b62;--rule:#d3dbd4;--field:#fff;
+  --screen:#0d1410;--screen-ink:#eaf3ec;--screen-soft:#8ea597;--screen-rule:#25342b;
+  --accent:#f2b705;--go:#2e9d63;--stop:#c4513e;--bar:#5d7b69;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --ground:#0a100c;--panel:#131c16;--ink:#e6eee8;--soft:#9cb0a3;--rule:#26342b;--field:#0f1712;
+  --screen:#050806;--screen-rule:#1c2821;color-scheme:dark}}
+:root[data-theme=dark]{--ground:#0a100c;--panel:#131c16;--ink:#e6eee8;--soft:#9cb0a3;--rule:#26342b;--field:#0f1712;--screen:#050806;--screen-rule:#1c2821;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.5 system-ui,"Segoe UI",Roboto,"Noto Sans",sans-serif}
+header{display:flex;align-items:center;gap:10px;max-width:960px;margin:0 auto;padding:14px 16px 6px}
+header h1{margin:0;font-size:22px;letter-spacing:.02em}header h1 span{color:var(--accent)}
+header .status{flex:1;color:var(--soft);font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main{max-width:960px;margin:0 auto;padding:6px 16px 40px}
+button{font:inherit;cursor:pointer;color:inherit}
+.btn{min-height:40px;padding:0 14px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--soft)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* Rotējošais ekrāns */
+.screen{position:relative;background:var(--screen);color:var(--screen-ink);border-radius:14px;padding:22px 24px 26px;min-height:340px;display:flex;flex-direction:column;cursor:pointer;user-select:none;overflow:hidden}
+.screen .top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid var(--screen-rule);padding-bottom:8px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:15px}
+.screen .top .tag{color:var(--screen-soft);font-weight:500;text-transform:none;letter-spacing:0}
+.screen .tag.warn{color:var(--accent)}
+.screen .big{display:flex;align-items:baseline;gap:10px;margin:18px 0 6px;flex-wrap:wrap}
+.screen .value{font-size:clamp(56px,13vw,112px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.screen .unit{font-size:clamp(16px,3vw,22px);color:var(--screen-soft);line-height:1.25}
+.screen .line{font-size:clamp(16px,2.6vw,21px)}
+.screen .line.soft{color:var(--screen-soft)}
+.screen .place{font-size:clamp(18px,3vw,26px);font-weight:600;margin-top:4px}
+.screen .route{display:inline-block;margin-top:10px;color:var(--accent);font-weight:600;text-decoration:none}
+.screen .route:hover{text-decoration:underline}
+.screen .empty{margin:auto 0;text-align:center;color:var(--screen-soft);font-size:22px}
+.screen .chart{margin-top:auto;padding-top:14px}
+.screen svg{display:block;width:100%;height:120px;overflow:visible}
+.screen .progress{position:absolute;left:0;bottom:0;height:4px;background:var(--accent);width:0}
+.dots{display:flex;gap:8px;justify-content:center;margin:12px 0 4px}
+.dots button{width:34px;height:8px;border-radius:4px;border:0;background:var(--rule);padding:0}
+.dots button[aria-current=true]{background:var(--accent)}
+.dots button:disabled{opacity:.35;cursor:default}
+.hint{color:var(--soft);font-size:14px;margin:0 0 12px}
+.center{text-align:center}
+
+/* Kopskats */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,44%),1fr));gap:12px;margin:18px 0}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer}
+.card.off{opacity:.55}.card.cur{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.card b{display:block;font-size:13px;color:var(--soft);font-weight:600}
+.card .v{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2;margin:2px 0}
+.card small{display:block;color:var(--soft);font-size:13px;line-height:1.35}
+
+/* Iestatījumi */
+section.box{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:16px;margin:0 0 14px}
+section.box h2{margin:0 0 4px;font-size:19px}
+.row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--rule)}
+.row:first-of-type{border-top:0}.row .name{font-weight:600}
+.row .extra{grid-column:2/4;display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:14px;color:var(--soft)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--go);margin:0}
+label{font-weight:600}
+label.f{display:block;margin:0 0 12px}
+input:not([type=checkbox]):not([type=range]),select{display:block;width:100%;height:42px;margin-top:4px;padding:0 10px;border:1px solid var(--rule);border-radius:6px;background:var(--field);color:var(--ink);font:inherit;font-weight:400}
+.sec{display:flex;align-items:center;gap:6px;font-weight:400}
+.sec input{width:78px!important;display:inline-block!important;margin:0!important;text-align:right}
+.inline{display:inline-flex;align-items:center;gap:8px;font-weight:400}
+.inline select{width:auto;display:inline-block;margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+input[type=range]{width:100%;accent-color:var(--go)}
+#map{height:360px;border-radius:8px;border:1px solid var(--rule);margin:0 0 10px;background:var(--ground)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:6px 4px;border-top:1px solid var(--rule);vertical-align:top}
+th{color:var(--soft);font-weight:600;border-top:0}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.best td{font-weight:700}
+details summary{cursor:pointer;font-weight:600;margin:4px 0 10px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 12px;font-size:14px}dt{color:var(--soft)}dd{margin:0;overflow-wrap:anywhere}
+
+/* Pilnekrāns: tikai ekrāns */
+body.kiosk header,body.kiosk .after{display:none}
+body.kiosk main{max-width:none;padding:0}
+body.kiosk .screen{border-radius:0;min-height:100vh;padding:5vh 6vw}
+body.kiosk .screen .value{font-size:clamp(80px,20vw,240px)}
+body.kiosk .screen svg{height:24vh}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}.screen{padding:18px 16px 22px;min-height:300px}header{flex-wrap:wrap}header .status{order:3;flex-basis:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>⚡</span> Energ</h1>
+  <div class="status" id="status">Ielādē datus…</div>
+  <button class="btn" id="fullscreen" title="Rādīt tikai ekrānu">Pilnekrāns</button>
+</header>
+<main>
+  <div class="screen" id="screen" role="button" tabindex="0" aria-live="polite" aria-label="Ekrāns. Pieskaries, lai pārietu uz nākamo sadaļu."></div>
+  <div class="after">
+    <div class="dots" id="dots" aria-label="Sadaļas"></div>
+    <p class="hint center">Pieskaries ekrānam, lai pārietu uz nākamo sadaļu.</p>
+    <div class="cards" id="cards"></div>
+
+    <section class="box">
+      <h2>Ekrāna sadaļas</h2>
+      <p class="hint">Ieslēgtās sadaļas mainās pa kārtai. Iestatījumi saglabājas šajā pārlūkā.</p>
+      <div id="rows"></div>
+    </section>
+
+    <section class="box">
+      <h2>Mana vieta</h2>
+      <p class="hint">Pieskaries kartei vai pavelc marķieri. Lētāko degvielu meklē tikai stacijās, līdz kurām nokļūsti norādītajā laikā.</p>
+      <div class="tools"><button class="btn" id="locate">Mana atrašanās vieta</button></div>
+      <div id="map"></div>
+      <p class="hint" id="mapNote"></p>
+      <div class="grid2">
+        <label class="f">Platums<input id="lat" inputmode="decimal"></label>
+        <label class="f">Garums<input id="lon" inputmode="decimal"></label>
+      </div>
+      <label class="f">Maksimālais laiks ceļā: <span id="maxMinText"></span><input id="maxMin" type="range" min="1" max="90" step="1"></label>
+      <div class="grid2">
+        <label class="f">Vidējais ātrums, km/h<input id="speed" type="number" min="5" max="130"></label>
+        <label class="f inline" style="margin-top:30px"><input id="roundTrip" type="checkbox">Turp un atpakaļ</label>
+      </div>
+      <p class="hint" id="reach"></p>
+    </section>
+
+    <section class="box">
+      <h2>Stacijas robežās</h2>
+      <p class="hint">Lētākās vispirms. <label class="inline">Degviela <select id="listFuel"></select></label></p>
+      <div id="list"></div>
+    </section>
+
+    <section class="box">
+      <h2>Dati</h2>
+      <dl id="dataInfo"></dl>
+      <div class="tools"><button class="btn" id="refresh">Atjaunot tagad</button></div>
+      <details>
+        <summary>Datu avotu adreses</summary>
+        <label class="f">Degvielas staciju saraksts (JSON)<input id="fuelUrl" type="url" autocomplete="off"></label>
+        <label class="f">Elektrības cenu rezerve (JSON)<input id="elecUrl" type="url" autocomplete="off"></label>
+        <button class="btn" id="resetUrls">Atjaunot noklusējumu</button>
+      </details>
+      <p class="hint" style="margin-top:12px">Elektrība: Nord Pool dienas tirgus cena Latvijai (Elering API), bez tirgotāja uzcenojuma un sadales. Degviela: tīklu publicētās zemākās cenas un adreses, kuras ik pēc 2 stundām apkopo GitHub Action. Karte: © OpenStreetMap.</p>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const RAW = 'https://raw.githubusercontent.com/komuna7/egg1/main/S3supermini_Energ/data/';
+const DEFAULT_FUEL_URL = RAW + 'fuel.json';
+const DEFAULT_ELEC_URL = RAW + 'electricity.json';
+const ELERING = 'https://dashboard.elering.ee/api/nps/price';
+const ROAD_FACTOR = 1.3, VAT = 0.21;
+const FUEL_NAMES = {lpg: 'Autogāze (LPG)', '95': 'Benzīns 95', '98': 'Benzīns 98', dd: 'Dīzeļdegviela'};
+const SECTION_NAMES = {elec: 'Elektrība', lpg: 'Gāze (LPG)', petrol: 'Benzīns', diesel: 'Dīzeļdegviela'};
+const STORE = 'energ-web-v1';
+
+const defaults = {
+  sections: [{id: 'elec', on: true, sec: 10}, {id: 'lpg', on: true, sec: 8},
+             {id: 'petrol', on: true, sec: 8}, {id: 'diesel', on: true, sec: 8}],
+  lat: 56.9496, lon: 24.1134, maxMin: 15, speed: 50, roundTrip: false,
+  petrol: '95', vat: true, listFuel: 'lpg', fuelUrl: DEFAULT_FUEL_URL, elecUrl: DEFAULT_ELEC_URL,
+};
+let cfg = structuredClone(defaults);
+try {
+  const savedCfg = JSON.parse(localStorage.getItem(STORE) || 'null');
+  if (savedCfg) cfg = Object.assign(cfg, savedCfg);
+} catch (e) { /* bez krātuves strādā ar noklusējumu */ }
+function save() { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) {} }
+
+const elec = {slots: [], source: '', fetched: 0, error: ''};
+const fuel = {stations: [], updated: '', fetched: 0, error: ''};
+
+// ------------------------------------------------------------ palīgi
+const num = (v, d) => v == null || !isFinite(v) ? '–' : Number(v).toFixed(d).replace('.', ',');
+const hhmm = t => new Date(t * 1000).toLocaleTimeString('lv-LV', {hour: '2-digit', minute: '2-digit'});
+const stamp = ms => ms ? new Date(ms).toLocaleString('lv-LV', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'nav';
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+function cents(eurMwh) { const c = eurMwh / 10; return cfg.vat && c > 0 ? c * (1 + VAT) : c; }
+function centsText(c) { const a = Math.abs(c); return num(c, a >= 100 ? 0 : a >= 10 ? 1 : 2); }
+
+async function getJson(url, ms = 12000) {
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+
+// ------------------------------------------------------------ elektrība
+function rigaMidnight() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function parseSlots(payload) {
+  const list = payload && payload.data && payload.data.lv || [];
+  return list.filter(e => isFinite(e.timestamp) && isFinite(e.price))
+    .map(e => ({t: +e.timestamp, p: +e.price})).sort((a, b) => a.t - b.t);
+}
+async function loadElectricity() {
+  const start = rigaMidnight(), end = new Date(start.getTime() + 2 * 86400e3);
+  try {
+    const slots = parseSlots(await getJson(`${ELERING}?start=${start.toISOString()}&end=${end.toISOString()}`));
+    if (!slots.length) throw new Error('tukša atbilde');
+    Object.assign(elec, {slots, source: 'Elering', fetched: Date.now(), error: ''});
+    return;
+  } catch (e) { elec.error = 'Elering: ' + e.message; }
+  try {
+    const slots = parseSlots(await getJson(cfg.elecUrl));
+    if (!slots.length) throw new Error('tukšs fails');
+    Object.assign(elec, {slots, source: 'rezerves fails', fetched: Date.now()});
+  } catch (e) { elec.error += '; rezerve: ' + e.message; }
+}
+function currentSlot(now = Date.now() / 1000) {
+  const s = elec.slots;
+  for (let i = s.length - 1; i >= 0; i--) {
+    if (s[i].t <= now) {
+      const step = i + 1 < s.length ? s[i + 1].t - s[i].t : i > 0 ? s[i].t - s[i - 1].t : 3600;
+      return now < s[i].t + step ? i : -1;
+    }
+  }
+  return -1;
+}
+function next24h(i) { const s = elec.slots; return s.slice(i).filter(x => x.t - s[i].t < 86400); }
+
+// ------------------------------------------------------------ degviela
+async function loadFuel() {
+  try {
+    const data = await getJson(cfg.fuelUrl);
+    const stations = (data.stations || []).filter(s => isFinite(s.lat) && isFinite(s.lon) && s.p);
+    Object.assign(fuel, {stations, updated: data.updated || '', fetched: Date.now(), error: ''});
+  } catch (e) { fuel.error = e.message; }
+}
+function km(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+const minutesFor = d => d * ROAD_FACTOR / cfg.speed * 60 * (cfg.roundTrip ? 2 : 1);
+const reachKm = () => cfg.maxMin / (cfg.roundTrip ? 2 : 1) / 60 * cfg.speed / ROAD_FACTOR;
+function withTravel() {
+  return fuel.stations.map(s => { const d = km(cfg.lat, cfg.lon, s.lat, s.lon); return {...s, km: d, min: minutesFor(d)}; });
+}
+// Lētākā sasniedzamā (vienādai cenai tuvākā) un tuvākā vispār.
+function pick(key, list = withTravel()) {
+  let best = null, nearest = null;
+  for (const s of list) {
+    const p = s.p[key];
+    if (!(p > 0)) continue;
+    if (!nearest || s.min < nearest.min) nearest = s;
+    if (s.min > cfg.maxMin) continue;
+    if (!best || p < best.p[key] - 0.0005 || (Math.abs(p - best.p[key]) <= 0.0005 && s.min < best.min)) best = s;
+  }
+  return {best, nearest};
+}
+const sectionFuel = id => id === 'lpg' ? 'lpg' : id === 'diesel' ? 'dd' : cfg.petrol;
+
+// ------------------------------------------------------------ ekrāns
+let current = 0, startedAt = performance.now();
+function enabledIndexes() { return cfg.sections.map((s, i) => s.on ? i : -1).filter(i => i >= 0); }
+function go(index) { current = index; startedAt = performance.now(); renderScreen(); renderDots(); renderCards(); }
+function advance() {
+  const on = enabledIndexes();
+  if (!on.length) return go(current);
+  const later = on.find(i => i > current);
+  go(later != null ? later : on[0]);
+}
+
+function chart(points, cheapestIndex) {
+  const ns = 'http://www.w3.org/2000/svg', W = 960, H = 120, top = 4, base = H - 20;
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'Cena nākamās 24 stundas');
+  const values = points.map(p => cents(p.p));
+  const lo = Math.min(0, ...values), hi = Math.max(lo + 1, ...values), n = values.length;
+  const y = v => base - (v - lo) / (hi - lo) * (base - top);
+  values.forEach((v, i) => {
+    const r = document.createElementNS(ns, 'rect'), x = i * W / n, w = Math.max(1, W / n - (n > 48 ? 1 : 3));
+    const y0 = Math.min(y(v), y(0)), h = Math.max(2, Math.abs(y(v) - y(0)));
+    r.setAttribute('x', x); r.setAttribute('y', y0); r.setAttribute('width', w); r.setAttribute('height', h);
+    r.setAttribute('fill', i === 0 ? 'var(--accent)' : i === cheapestIndex ? 'var(--go)' : 'var(--bar)');
+    const t = document.createElementNS(ns, 'title'); t.textContent = `${hhmm(points[i].t)}  ${centsText(v)} c/kWh`;
+    r.append(t); svg.append(r);
+  });
+  // Laika atzīmes ik pēc 6 stundām.
+  points.forEach((p, i) => {
+    const d = new Date(p.t * 1000);
+    if (i === 0 || (d.getMinutes() === 0 && d.getHours() % 6 === 0)) {
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', i * W / n); t.setAttribute('y', H - 4);
+      t.setAttribute('fill', 'var(--screen-soft)'); t.setAttribute('font-size', '13');
+      t.textContent = i === 0 ? 'tagad' : hhmm(p.t);
+      svg.append(t);
+    }
+  });
+  return svg;
+}
+
+function screenElectricity(box) {
+  const i = currentSlot();
+  const top = el('div', 'top'); top.append(el('span', '', 'Elektrība LV'), el('span', 'tag', new Date().toLocaleTimeString('lv-LV', {hour: '2-digit', minute: '2-digit'})));
+  box.append(top);
+  if (i < 0) { box.append(el('div', 'empty', elec.fetched || elec.error ? 'Nav cenu šim brīdim' : 'Ielādē…')); return; }
+  const pts = next24h(i), c = cents(elec.slots[i].p);
+  let cheapest = 0; pts.forEach((p, k) => { if (p.p < pts[cheapest].p) cheapest = k; });
+  const big = el('div', 'big'); big.append(el('span', 'value', centsText(c)));
+  const unit = el('span', 'unit'); unit.append('c/kWh', document.createElement('br'), cfg.vat ? 'ar PVN' : 'bez PVN');
+  big.append(unit); box.append(big);
+  box.append(el('div', 'line', `Lētākais nākamajās 24 h: ${hhmm(pts[cheapest].t)} · ${centsText(cents(pts[cheapest].p))} c`));
+  const slotEnd = i + 1 < elec.slots.length ? elec.slots[i + 1].t : elec.slots[i].t + 900;
+  box.append(el('div', 'line soft', `Cena spēkā ${hhmm(elec.slots[i].t)}–${hhmm(slotEnd)}`));
+  const wrap = el('div', 'chart'); wrap.append(chart(pts, cheapest)); box.append(wrap);
+}
+
+function screenFuel(box, key) {
+  const {best, nearest} = pick(key), s = best || nearest;
+  const top = el('div', 'top'); top.append(el('span', '', FUEL_NAMES[key]),
+    el('span', best ? 'tag' : 'tag warn', best ? `līdz ${cfg.maxMin} min` : s ? `robežās nav, tuvākā` : ''));
+  box.append(top);
+  if (!s) { box.append(el('div', 'empty', fuel.stations.length ? 'Nav cenu šai degvielai' : fuel.error ? 'Nav datu: ' + fuel.error : 'Ielādē…')); return; }
+  const big = el('div', 'big'); big.append(el('span', 'value', num(s.p[key], 3)));
+  const unit = el('span', 'unit'); unit.append('EUR', document.createElement('br'), 'litrā'); big.append(unit); box.append(big);
+  box.append(el('div', 'place', s.b));
+  box.append(el('div', 'line', s.a));
+  box.append(el('div', 'line soft', `~${Math.round(s.min)} min · ${num(s.km * ROAD_FACTOR, 1)} km pa ceļu`));
+  const a = el('a', 'route', 'Maršruts ↗');
+  a.href = `https://www.google.com/maps/dir/?api=1&origin=${cfg.lat},${cfg.lon}&destination=${s.lat},${s.lon}`;
+  a.target = '_blank'; a.rel = 'noopener'; a.onclick = e => e.stopPropagation();
+  box.append(a);
+}
+
+function renderScreen() {
+  const box = $('screen'); box.textContent = '';
+  const sec = cfg.sections[current];
+  if (!sec || !sec.on) {
+    if (!enabledIndexes().length) { box.append(el('div', 'empty', 'Visas sadaļas ir izslēgtas')); return; }
+  }
+  if (sec.id === 'elec') screenElectricity(box); else screenFuel(box, sectionFuel(sec.id));
+  box.append(el('div', 'progress'));
+}
+
+function renderDots() {
+  const box = $('dots'); box.textContent = '';
+  cfg.sections.forEach((s, i) => {
+    const b = el('button'); b.disabled = !s.on; b.title = SECTION_NAMES[s.id];
+    b.setAttribute('aria-label', SECTION_NAMES[s.id]); b.setAttribute('aria-current', i === current);
+    b.onclick = () => go(i); box.append(b);
+  });
+}
+
+function card(title, value, lines, i) {
+  const c = el('button', 'card' + (cfg.sections[i].on ? '' : ' off') + (i === current ? ' cur' : ''));
+  c.append(el('b', '', title), el('div', 'v', value));
+  for (const l of lines) c.append(el('small', '', l));
+  c.onclick = () => { go(i); $('screen').scrollIntoView({behavior: 'smooth', block: 'nearest'}); };
+  return c;
+}
+function renderCards() {
+  const box = $('cards'); box.textContent = '';
+  const list = withTravel();
+  cfg.sections.forEach((s, i) => {
+    if (s.id === 'elec') {
+      const k = currentSlot();
+      box.append(card('Elektrība LV', k < 0 ? '–' : centsText(cents(elec.slots[k].p)) + ' c', [cfg.vat ? 'c/kWh ar PVN' : 'c/kWh bez PVN', s.on ? `${s.sec} s ekrānā` : 'izslēgta'], i));
+    } else {
+      const key = sectionFuel(s.id), {best, nearest} = pick(key, list), x = best || nearest;
+      box.append(card(FUEL_NAMES[key], x ? num(x.p[key], 3) + ' €' : '–',
+        x ? [(best ? '' : 'Tuvākā: ') + x.b + ', ' + x.a, `~${Math.round(x.min)} min`] : ['Nav datu'], i));
+    }
+  });
+}
+
+function tick() {
+  const sec = cfg.sections[current];
+  if (sec && sec.on) {
+    const elapsed = performance.now() - startedAt, total = sec.sec * 1000;
+    if (elapsed >= total) advance();
+    else { const bar = document.querySelector('.screen .progress'); if (bar) bar.style.width = (elapsed / total * 100) + '%'; }
+  } else if (enabledIndexes().length) advance();
+  requestAnimationFrame(tick);
+}
+$('screen').onclick = advance;
+$('screen').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); advance(); } };
+
+// ------------------------------------------------------------ iestatījumi
+function renderRows() {
+  const box = $('rows'); box.textContent = '';
+  for (const s of cfg.sections) {
+    const row = el('div', 'row');
+    const on = el('input'); on.type = 'checkbox'; on.checked = s.on; on.setAttribute('aria-label', 'Rādīt: ' + SECTION_NAMES[s.id]);
+    on.onchange = () => { s.on = on.checked; changed(); };
+    const sec = el('label', 'sec'), n = el('input'); n.type = 'number'; n.min = 2; n.max = 600; n.value = s.sec;
+    n.setAttribute('aria-label', SECTION_NAMES[s.id] + ': sekundes');
+    n.oninput = () => { const v = parseInt(n.value); if (v >= 2 && v <= 600) { s.sec = v; changed(); } };
+    sec.append(n, 's');
+    row.append(on, el('span', 'name', SECTION_NAMES[s.id]), sec);
+    const extra = el('div', 'extra');
+    if (s.id === 'elec') {
+      const l = el('label', 'inline'), c = el('input'); c.type = 'checkbox'; c.checked = cfg.vat;
+      c.onchange = () => { cfg.vat = c.checked; changed(); };
+      l.append(c, 'Ar PVN 21%'); extra.append(l);
+    } else if (s.id === 'petrol') {
+      const l = el('label', 'inline'), sel = el('select');
+      for (const k of ['95', '98']) { const o = el('option', '', 'Benzīns ' + k); o.value = k; sel.append(o); }
+      sel.value = cfg.petrol; sel.onchange = () => { cfg.petrol = sel.value; changed(); renderListFuel(); };
+      l.append(sel); extra.append(l);
+    }
+    if (extra.childNodes.length) row.append(extra);
+    box.append(row);
+  }
+}
+function changed() { save(); renderScreen(); renderDots(); renderCards(); renderList(); drawReach(); }
+
+let map = null, home = null, circle = null, layer = null;
+function setPoint(lat, lon, pan) {
+  cfg.lat = Math.round(lat * 1e5) / 1e5; cfg.lon = Math.round(lon * 1e5) / 1e5;
+  $('lat').value = cfg.lat.toFixed(5); $('lon').value = cfg.lon.toFixed(5);
+  if (map && pan) map.setView([cfg.lat, cfg.lon], Math.max(map.getZoom(), 12));
+  changed(); drawStations();
+}
+function renderPlace() {
+  $('lat').value = cfg.lat.toFixed(5); $('lon').value = cfg.lon.toFixed(5);
+  $('maxMin').value = Math.min(90, cfg.maxMin); $('maxMinText').textContent = cfg.maxMin + ' min';
+  $('speed').value = cfg.speed; $('roundTrip').checked = cfg.roundTrip; drawReach();
+}
+function drawReach() {
+  const r = reachKm();
+  $('reach').textContent = `Ar ${cfg.speed} km/h ${cfg.roundTrip ? 'turp un atpakaļ ' : ''}${cfg.maxMin} minūtēs aizbrauc apmēram ${num(r * ROAD_FACTOR, 1)} km pa ceļu (taisnē līdz ${num(r, 1)} km).`;
+  if (map) { home.setLatLng([cfg.lat, cfg.lon]); circle.setLatLng([cfg.lat, cfg.lon]).setRadius(r * 1000); }
+}
+for (const k of ['lat', 'lon']) $(k).onchange = () => {
+  const v = parseFloat($(k).value.replace(',', '.'));
+  if (isFinite(v)) { const p = {lat: cfg.lat, lon: cfg.lon, [k]: v}; setPoint(p.lat, p.lon, true); }
+};
+$('maxMin').oninput = () => { cfg.maxMin = parseInt($('maxMin').value); $('maxMinText').textContent = cfg.maxMin + ' min'; changed(); drawStations(); };
+$('speed').oninput = () => { const v = parseInt($('speed').value); if (v >= 5 && v <= 130) { cfg.speed = v; changed(); drawStations(); } };
+$('roundTrip').onchange = () => { cfg.roundTrip = $('roundTrip').checked; changed(); drawStations(); };
+$('locate').onclick = () => {
+  if (!navigator.geolocation) { $('mapNote').textContent = 'Pārlūks neatbalsta atrašanās vietu.'; return; }
+  $('mapNote').textContent = 'Nosaka atrašanās vietu…';
+  navigator.geolocation.getCurrentPosition(p => { setPoint(p.coords.latitude, p.coords.longitude, true); },
+    e => { $('mapNote').textContent = 'Atrašanās vietu neizdevās noteikt: ' + e.message; }, {enableHighAccuracy: false, timeout: 15000});
+};
+
+function initMap() {
+  if (!window.L) { $('map').hidden = true; $('mapNote').textContent = 'Karte neielādējās. Ievadi koordinātas, piem., no Google Maps.'; return; }
+  map = L.map('map').setView([cfg.lat, cfg.lon], 11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '&copy; OpenStreetMap'}).addTo(map);
+  circle = L.circle([cfg.lat, cfg.lon], {radius: reachKm() * 1000, color: '#2e9d63', weight: 2, fillOpacity: .07}).addTo(map);
+  home = L.marker([cfg.lat, cfg.lon], {draggable: true}).addTo(map);
+  home.on('dragend', () => { const l = home.getLatLng(); setPoint(l.lat, l.lng); });
+  map.on('click', e => setPoint(e.latlng.lat, e.latlng.lng));
+  layer = L.layerGroup().addTo(map);
+  drawStations();
+}
+function drawStations() {
+  if (!map) return;
+  layer.clearLayers();
+  const limit = Math.max(reachKm() * 2, 3), keys = ['lpg', cfg.petrol, 'dd'];
+  const id = s => s.lat + ',' + s.lon + ',' + s.b;
+  const bestSet = new Set(keys.map(k => pick(k).best).filter(Boolean).map(id));
+  let shown = 0;
+  for (const s of withTravel()) {
+    if (s.km > limit) continue;
+    shown++;
+    const inside = s.min <= cfg.maxMin, top = bestSet.has(id(s));
+    const m = L.circleMarker([s.lat, s.lon], {radius: top ? 9 : 6, color: top ? '#f2b705' : inside ? '#c4513e' : '#8a948d', weight: 2, fillOpacity: inside ? .7 : .3});
+    const box = el('div'); box.append(el('b', '', s.b), document.createElement('br'), s.a, document.createElement('br'), `~${Math.round(s.min)} min`);
+    for (const k of keys) if (s.p[k] > 0) box.append(document.createElement('br'), `${FUEL_NAMES[k]}: ${num(s.p[k], 3)} €`);
+    m.bindPopup(box); layer.addLayer(m);
+  }
+  $('mapNote').textContent = fuel.stations.length
+    ? `Dzeltenie: lētākās izvēlētās. Sarkanie: robežās. Pelēkie: tālāk. Kartē ${shown} stacijas.`
+    : 'Staciju saraksts vēl nav ielādēts.';
+}
+
+function renderListFuel() {
+  const sel = $('listFuel'), keys = ['lpg', cfg.petrol, 'dd'];
+  if (!keys.includes(cfg.listFuel)) cfg.listFuel = keys[0];
+  sel.textContent = '';
+  for (const k of keys) { const o = el('option', '', FUEL_NAMES[k]); o.value = k; sel.append(o); }
+  sel.value = cfg.listFuel; renderList();
+}
+$('listFuel').onchange = () => { cfg.listFuel = $('listFuel').value; save(); renderList(); };
+function renderList() {
+  const key = cfg.listFuel, box = $('list'); box.textContent = '';
+  const rows = withTravel().filter(s => s.p[key] > 0 && s.min <= cfg.maxMin)
+    .sort((a, b) => a.p[key] - b.p[key] || a.min - b.min).slice(0, 15);
+  if (!rows.length) { box.append(el('p', 'hint', fuel.stations.length ? 'Robežās nav staciju ar šo degvielu.' : 'Nav datu.')); return; }
+  const t = el('table'), head = el('tr');
+  for (const h of ['Stacija', 'Cena', 'Ceļā']) head.append(el('th', h === 'Stacija' ? '' : 'n', h));
+  t.append(head);
+  rows.forEach((s, i) => {
+    const r = el('tr', i === 0 ? 'best' : ''), name = el('td');
+    name.append(s.b, document.createElement('br'), el('small', '', s.a));
+    r.append(name, el('td', 'n', num(s.p[key], 3) + ' €'), el('td', 'n', '~' + Math.round(s.min) + ' min'));
+    t.append(r);
+  });
+  box.append(t);
+}
+
+function renderData() {
+  const d = $('dataInfo'); d.textContent = '';
+  const add = (k, v) => d.append(el('dt', '', k), el('dd', '', v));
+  add('Elektrība', elec.fetched ? `${elec.slots.length} intervāli no ${elec.source}, ielādēti ${stamp(elec.fetched)}` : 'nav datu' + (elec.error ? ` (${elec.error})` : ''));
+  add('Degviela', fuel.fetched ? `${fuel.stations.length} stacijas, ielādētas ${stamp(fuel.fetched)}` : 'nav datu' + (fuel.error ? ` (${fuel.error})` : ''));
+  if (fuel.updated) add('Saraksts veidots', stamp(Date.parse(fuel.updated)));
+  const ok = elec.fetched && fuel.fetched && fuel.stations.length;
+  $('status').textContent = ok ? `Atjaunots ${stamp(Math.max(elec.fetched, fuel.fetched))}` : (elec.error || fuel.error || !fuel.stations.length) ? 'Daļa datu nav pieejama, sk. sadaļu Dati' : 'Ielādē datus…';
+}
+$('fuelUrl').onchange = () => { cfg.fuelUrl = $('fuelUrl').value.trim() || DEFAULT_FUEL_URL; save(); refreshAll(); };
+$('elecUrl').onchange = () => { cfg.elecUrl = $('elecUrl').value.trim() || DEFAULT_ELEC_URL; save(); refreshAll(); };
+$('resetUrls').onclick = () => { cfg.fuelUrl = DEFAULT_FUEL_URL; cfg.elecUrl = DEFAULT_ELEC_URL; $('fuelUrl').value = cfg.fuelUrl; $('elecUrl').value = cfg.elecUrl; save(); refreshAll(); };
+$('refresh').onclick = () => refreshAll();
+
+async function refreshAll() {
+  $('status').textContent = 'Ielādē datus…';
+  await Promise.all([loadElectricity(), loadFuel()]);
+  renderScreen(); renderCards(); renderList(); renderData(); drawStations();
+}
+
+// ------------------------------------------------------------ pilnekrāns
+$('fullscreen').onclick = async () => {
+  document.body.classList.add('kiosk');
+  try { await document.documentElement.requestFullscreen(); } catch (e) { /* paliek tikai ekrāna režīms */ }
+};
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('kiosk'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.body.classList.remove('kiosk'); });
+
+// ------------------------------------------------------------ starts
+$('fuelUrl').value = cfg.fuelUrl; $('elecUrl').value = cfg.elecUrl;
+if (!cfg.sections[current].on) { const on = enabledIndexes(); if (on.length) current = on[0]; }
+renderRows(); renderPlace(); renderListFuel(); renderDots(); renderScreen(); renderCards(); renderData();
+initMap();
+refreshAll();
+setInterval(loadElectricityAndRender, 30 * 60e3);
+setInterval(() => loadFuel().then(() => { renderCards(); renderList(); renderData(); drawStations(); }), 60 * 60e3);
+function loadElectricityAndRender() { loadElectricity().then(() => { renderCards(); renderData(); }); }
+requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
