@@ -1,1 +1,14 @@
-{"updated":"","stations":[]}
+{"updated":"2026-11-26T00:55:11+00:00","stations":[{"b":"Viada","a":"Zemnieku iela 58, Liepāja","lat":56.52146,"lon":21.02705,"p":{"dd":1.857}},
+{"b":"Viada","a":"Valdeķu iela 34, Rīga","lat":56.91027,"lon":24.09617,"p":{"95":1.647,"98":1.752,"dd":1.857,"lpg":1.117}},
+{"b":"Viada","a":"Salaspils iela 4a, Rīga","lat":56.92265,"lon":24.17984,"p":{"95":1.647,"98":1.752,"dd":1.857}},
+{"b":"Viada","a":"Kārļa Ulmaņa gatve 67, Rīga","lat":56.92728,"lon":24.0497,"p":{"95":1.647,"98":1.752,"dd":1.857}},
+{"b":"Circle K","a":"Lubānas iela 119A","lat":56.93229,"lon":24.2029,"p":{"lpg":1.12}},
+{"b":"Circle K","a":"Kārļa Ulmaņa gatve 117","lat":56.93363,"lon":24.0039,"p":{"lpg":1.12}},
+{"b":"Viada","a":"Andreja Saharova iela 10, Rīga","lat":56.93479,"lon":24.20285,"p":{"95":1.647,"98":1.752,"lpg":1.117}},
+{"b":"Viada","a":"Dārzciema iela 62, Rīga","lat":56.93884,"lon":24.18143,"p":{"dd":1.924}},
+{"b":"Viada","a":"Valgales iela 1, Rīga","lat":56.93914,"lon":24.00159,"p":{"95":1.647,"98":1.752,"dd":1.857}},
+{"b":"Viada","a":"Dārzciema iela 69, Rīga","lat":56.94013,"lon":24.18299,"p":{"dd":1.924}},
+{"b":"Circle K","a":"Augusta Deglava iela 164C","lat":56.94281,"lon":24.22963,"p":{"lpg":1.12}},
+{"b":"Viada","a":"Vecā Biķernieku iela 1, Rīga","lat":56.95836,"lon":24.23926,"p":{"95":1.647,"98":1.752,"dd":1.857}},
+{"b":"Circle K","a":"Brīvības gatve 203","lat":56.97404,"lon":24.16813,"p":{"dd":1.911}},
+{"b":"Circle K","a":"Brīvības gatve 265","lat":56.97914,"lon":24.18435,"p":{"dd":1.911,"lpg":1.12}}]}
